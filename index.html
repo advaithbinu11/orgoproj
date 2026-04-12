@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MS-Explorer | Interactive Spectrometry</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@300;400;600&display=swap');
+        .background-animation {
+    position: fixed; /* Stays in place when scrolling */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* MANDATORY: Sets it behind all cards and content */
+    background-color: var(--bg); /* Maintain your existing background color */
+    overflow: hidden; /* No scrollbars from drifting molecules */
+}
+
+/* Base Molecule Class */
+.molecule {
+    position: absolute;
+    color: var(--text-dim); /* Use your dim text color for a ghost effect */
+    transition: opacity 0.5s ease; /* Fade on mouse hover if needed */
+    pointer-events: none; /* Molecules don't block clicks to cards behind them */
+}
+
+/* Sizing Classes (Use SVGs for crisp scaling) */
+.molecule.small { width: 40px; height: 40px; }
+.molecule.med   { width: 80px; height: 80px; }
+.molecule.big   { width: 150px; height: 150px; }
+
+/* Speed Classes (Infinite, Linear loop) */
+.molecule.fast { animation: floatTwirl 15s linear infinite; }
+.molecule.med  { animation: floatTwirl 30s linear infinite; }
+.molecule.slow { animation: floatTwirl 60s linear infinite; }
+
+/* The Combined Animation: Float (Translate) and Twirl (Rotate) */
+@keyframes floatTwirl {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+    25% {
+        transform: translate(10px, -15px) rotate(90deg); /* Drifts slightly right and up */
+    }
+    50% {
+        transform: translate(0px, -30px) rotate(180deg); /* Reaches peak height */
+    }
+    75% {
+        transform: translate(-10px, -15px) rotate(270deg); /* Drifts slightly left on descent */
+    }
+    100% {
+        transform: translate(0, 0) rotate(360deg); /* Returns home */
+    }
+}
+
+/* Optional: Subtle opacity fade in when the page loads */
+body {
+    animation: fadeInPage 2s ease-out;
+}
+@keyframes fadeInPage {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+        :root {
+            --primary: #6366f1;
+            --secondary: #ec4899;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 40px 40px;
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        header {
+            padding: 80px 20px;
+            text-align: center;
+            background: radial-gradient(circle at center, var(--accent-glow), transparent);
+        }
+
+        header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #818cf8, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 100px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        .mcl-eject {
+        transform: translateY(-80px) translateX(-50px) rotate(-15deg);
+        opacity: 0;
+        filter: blur(4px);
+        }
+        .mcl-stay {
+            transform: scale(1.1);
+            text-shadow: 0 0 15px var(--secondary);
+        }
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover { transform: translateY(-5px); }
+
+        .full-width { grid-column: 1 / -1; }
+        button.secondary {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-dim) !important;
+}
+
+        /* The "Active" state we apply via JS */
+        .active-mode {
+            background: var(--secondary) !important; /* Pink */
+            color: white !important;
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            color: var(--secondary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* --- THE LAB STAGE --- */
+        .molecule-stage {
+            height: 200px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            border: 1px dashed rgba(255,255,255,0.2);
+        }
+
+        .atom-group {
+            display: flex;
+            align-items: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 500;
+            transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .bond-line {
+            width: 40px;
+            height: 2px;
+            background: var(--text-dim);
+            margin: 0 10px;
+            transition: opacity 0.3s;
+        }
+
+        /* Animation States */
+        .break-left { transform: translateX(-120px) translateY(20px) rotate(-20deg); opacity: 0.3; filter: blur(2px); }
+        .break-right { transform: translateX(60px) scale(1.1); color: #fbbf24; text-shadow: 0 0 15px rgba(251, 191, 36, 0.6); }
+        .hidden-bond { opacity: 0; }
+
+        /* --- SPECTRUM MOCKUP --- */
+        .spectrum-container {
+    position: relative;
+    padding: 20px 40px 60px 60px;
+    background: #000;
+    border-radius: 12px;
+    margin-top: 20px;
+}
+
+.spectrum-box {
+    position: relative;
+    height: 200px;
+    border-left: 2px solid var(--text-dim);
+    border-bottom: 2px solid var(--text-dim);
+    width: 100%;
+}
+
+.grid-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed rgba(255,255,255,0.1);
+    width: 100%;
+}
+
+.peak {
+    position: absolute;
+    bottom: 0;
+    width: 2px; /* Real MS peaks are very sharp lines */
+    background: var(--primary);
+    transition: all 0.3s ease;
+}
+
+.peak:hover {
+    width: 4px;
+    filter: brightness(1.5);
+    z-index: 10;
+}
+
+.peak::after {
+    content: attr(data-label);
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.peak.base {
+    background: var(--secondary);
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.4);
+}
+
+/* Axis Labels */
+.y-axis-label {
+    position: relative;
+    right: 230px;
+    top: 30%;
+    transform: rotate(-90deg) translateY(-10%) translateX(15%);
+    font-size: 0.8rem;
+    color: rgb(70, 227, 255);
+    letter-spacing: 1px;
+}
+
+.x-axis {
+    position: relative;
+    width: 100%;
+    height: 30px;
+}
+
+.x-label {
+    position: absolute;
+    top: 5px;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+.sigma-break-left {
+    transform: translateX(-40px) scale(1.1);
+    color: var(--secondary); /* The detected cation */
+    text-shadow: 0 0 15px var(--secondary);
+}
+.sigma-break-right {
+    transform: translateX(80px) translateY(-30px) rotate(10deg);
+    opacity: 0.3; /* The lost neutral radical */
+    filter: blur(2px);
+}
+
+/* Inductive States */
+.inductive-break-left {
+    transform: translateX(-100px) scale(1.1);
+    color: #fbbf24; /* The detected carbocation */
+    text-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+}
+.inductive-break-right {
+    transform: translateX(40px) translateY(20px);
+    opacity: 0.4; /* The 'neutralized' halogen radical cation */
+}
+
+.axis-title {
+    text-align: center;
+    padding-top: 35px;
+    font-size: 0.8rem;
+    color: var(--secondary);
+    font-weight: 600;
+}
+
+        .spectrum-box {
+            height: 150px;
+            display: flex;
+            align-items: flex-end;
+            gap: 15px;
+            padding: 20px;
+            background: #000;
+            border-radius: 12px;
+        }
+
+        .peak {
+            width: 4px;
+            background: var(--primary);
+            border-radius: 2px 2px 0 0;
+            position: relative;
+            transition: height 1s;
+            transform: translateY(20%);
+        }
+
+        .peak::after {
+            content: attr(data-label);
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .peak.base { background: var(--secondary); height: 100%; }
+
+        /* --- CONTROLS --- */
+        .controls { display: flex; gap: 10px; margin-top: 20px; }
+        .eject-left { transform: translateX(-150px) rotate(-20deg); opacity: 0.2; filter: blur(3px); }
+    .glow-acylium { transform: scale(1.1) translateX(40px); color: #fbbf24; text-shadow: 0 0 15px #fbbf24; }
+    
+    .eject-up { transform: translateY(-80px); opacity: 0; }
+    .glow-enol { transform: scale(1.1); text-shadow: 0 0 15px var(--secondary); }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        button.secondary { background: rgba(255,255,255,0.1); }
+        button:hover { filter: brightness(1.2); }
+
+        .info-text {
+            margin-top: 15px;
+            padding: 10px;
+            border-left: 3px solid var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            font-size: 0.85rem;
+            min-height: 50px;
+        }
+
+        @media (max-width: 850px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="background-animation">
+    <div class="molecule big slow" style="top: 10%; left: 5%;">
+        <svg viewBox="0 0 100 100" opacity="0.3">
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M50 10 L90 30 L90 70 L50 90 L10 70 L10 30 Z M50 20 L80 35 L80 65 L50 80 L20 65 L20 35 Z"/>
+        </svg>
+    </div>
+    <div class="molecule med fast" style="top: 6%; left: 90%;">
+        <svg viewBox="0 0 120 100" opacity="0.3">
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M10 50 L30 30 L60 30 L80 50 L60 70 L30 70 Z M80 50 L100 30 L130 30 L150 50"/>
+        </svg>
+    </div>
+    <div class="molecule small med" style="top: 60%; left: 1%;">
+        <svg viewBox="0 0 100 100" opacity="0.3">
+            <path fill="none" stroke="currentColor" stroke-width="3" d="M30 50 L70 50 M50 30 L50 70 M35 35 L65 65 M35 65 L65 35"/>
+        </svg>
+    </div>
+    <div class="molecule big fast" style="top: 15%; left: 70%;">
+        <svg viewBox="0 0 140 100" opacity="0.3">
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M10 30 L40 10 L70 30 L70 70 L40 90 L10 70 Z M70 30 L100 10 L130 30 L130 70 L100 90 Z M100 10 L110 -10"/>
+        </svg>
+    </div>
+    <div class="molecule med slow" style="top: 50%; right: 10%;">
+        <svg viewBox="0 0 150 50" opacity="0.3">
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M10 25 L30 10 L50 25 L70 10 L90 25 L110 10 L130 25"/>
+        </svg>
+    </div>
+    <div class="molecule med med" style="top: 85%; left: 90%;">
+    <svg viewBox="0 0 100 60" opacity="0.3">
+        <path fill="none" stroke="currentColor" stroke-width="2" d="M10 40 L35 20 L60 40 L85 20"/>
+        <path fill="none" stroke="currentColor" stroke-width="2" d="M35 20 L35 0"/>
+    </svg>
+    </div>
+</div>
+<header>
+    <h1>MS-EXPLORER</h1>
+    <p>Visualizing Molecular Fragmentation & Ion Dynamics</p>
+</header>
+
+<div class="container">
+
+<div class="card">
+    <h2><span>⚡</span> The Fundamentals</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+        <div>
+            <p style="color: var(--secondary); font-weight: bold;">Nitrogen Rule</p>
+            <small>
+                Odd M+ = Odd N atoms.<br> 
+                Even M+ = 0 or Even N.
+            </small>
+        </div>
+        
+        <div>
+            <p style="color: var(--secondary); font-weight: bold;">Halogen</p>
+            <small>
+                <strong>Cl:</strong> 3:1 ratio at M+2<br>
+                <strong>Br:</strong> 1:1 ratio at M+2<br>
+                <strong>Look for twin peaks!</strong> 
+            </small>
+        </div>
+
+        <div>
+            <p style="color: var(--secondary); font-weight: bold;">Carbon</p>
+            <small>
+                #C = (M+1) Intensity / ((M) Intensity * 0.011)
+            </small>
+        </div>
+    </div>
+
+    <hr style="margin: 20px 0; opacity: 0.1;">
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div>
+            <p><strong>Base Peak:</strong> The most intense peak (100% abundance). Represents the most stable fragment, often a 3° carbocation or resonance-stabilized ion.</p>
+        </div>
+        <div>
+            <p><strong>Other Isotopic Signatures (M+2):</strong></p>
+            <ul style="font-size: 0.85rem; color: var(--text-dim); padding-left: 15px;">
+                <li><strong>Sulfur (34S):</strong> Notable 4% peak at M+2.</li>
+                <li><strong>Silicon (30Si):</strong> Notable 3% peak at M+2.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+    <div class="card">
+        <h2><span>📊</span> How to Read Mass Spectra</h2>
+<div class="spectrum-container">
+    <div class="y-axis-label">‎ ‎ ‎ Relative <br> Abundance (%)</div>
+    
+    <div class="spectrum-box" id="spectrum">
+        <div class="grid-line" style="bottom: 25%"></div>
+        <div class="grid-line" style="bottom: 50%"></div>
+        <div class="grid-line" style="bottom: 75%"></div>
+
+        <div class="peak" style="height: 40%; left: 36.25%; transform: translateY(50%);" data-label="29"></div>
+        <div class="peak" style="height: 60%; left: 53.75%; transform: translateY(30%)" data-label="43"></div>
+        <div class="peak base" style="height: 100%; left: 60.25%;" data-label="57"></div>
+        <div class="peak" style="height: 20%; left: 80.00%; transform: translateY(80%)" data-label="72 (M⁺)"></div>
+    </div>
+
+    <div class="x-axis">
+        <div class="x-label" style="left: 0%">0</div>
+        <div class="x-label" style="left: 25%">20</div>
+        <div class="x-label" style="left: 50%">40</div>
+        <div class="x-label" style="left: 75%">60</div>
+        <div class="x-label" style="left: 100%">80</div>
+        <div class="axis-title">m/z (Mass-to-Charge Ratio)</div>
+    </div>
+</div>
+        <p style="font-size: 0.8rem; margin-top: 15px; color: var(--text-dim);">
+            Example: Pentane. Notice the M+ is small, while the <strong>m/z 57</strong> (Butyl cation) is the Base Peak.
+        </p>
+    </div>
+
+
+    <div class="card full-width">
+        <h2><span>🪚</span> Sigma-Bond Cleavage (Alkanes)</h2>
+        <p style="font-size: 0.9rem; color: var(--text-dim); margin-bottom: 15px;">
+            Common in alkanes. Ionization removes an electron from a C-C sigma-bond, weakening it. Fragmentation favors the formation of more stable 3° or 2° carbocations.
+        </p>
+        <div class="molecule-stage" id="stage-sigma">
+            <div id="alk-l" class="atom-group">
+                (CH₃)₂CH
+                <div class="bond-line" id="bond-sigma"></div>
+            </div>
+            <div id="alk-r" class="atom-group">
+                •CH₃
+            </div>
+        </div>
+        <div class="controls">
+            <button onclick="runSigma()">Ionize Sigma-Bond</button>
+            <button class="secondary" onclick="resetSim('sigma')">Reset</button>
+        </div>
+        <div class="info-text" id="info-sigma">
+            Click to simulate ionization of a saturated hydrocarbon.
+        </div>
+    </div>
+
+    <div class="card full-width">
+        <h2><span>🧲</span> Inductive Cleavage (Halogens)</h2>
+        <p style="font-size: 0.9rem; color: var(--text-dim); margin-bottom: 15px;">
+            A heterolytic process common in molecules with highly electronegative atoms (like Halogens). The positive charge "pulls" an electron pair, breaking the bond.
+        </p>
+        <div class="molecule-stage" id="stage-inductive">
+            <div id="hal-l" class="atom-group">
+                CH₃CH₂
+                <div class="bond-line" id="bond-inductive"></div>
+            </div>
+            <div id="hal-r" class="atom-group">
+                Cl⁺
+            </div>
+        </div>
+        <div class="controls">
+            <button onclick="runInductive()" style="background-color: #a78bfa;">Simulate Inductive Pull</button>
+            <button class="secondary" onclick="resetSim('inductive')">Reset</button>
+        </div>
+        <div class="info-text" id="info-inductive">
+            Click to simulate cleavage driven by electronegativity.
+        </div>
+    </div>
+ <div class="card full-width">
+    <h2><span>🧪</span> Ketone Fragmentation Lab</h2>
+    
+    <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+        <button onclick="setMode('alpha')" id="btn-alpha" style="background: var(--secondary);">Mode: Alpha-Cleavage</button>
+        <button onclick="setMode('mclafferty')" id="btn-mcl" class="secondary">Mode: McLafferty</button>
+    </div>
+
+    <div class="molecule-stage" id="main-stage">
+        <div id="alpha-view" class="atom-group">
+            <div id="alk-chain" class="atom-group">
+                CH₃CH₂CH₂
+                <div class="bond-line" id="alpha-bond"></div>
+            </div>
+            <div id="acyl-ion" class="atom-group">[ C=O ]⁺</div>
+        </div>
+
+        <div id="mcl-view" class="atom-group" style="display: none; flex-direction: column; align-items: center;">
+            <div id="mcl-top" style="transition: all 0.8s ease;">CH₂=CH₂</div>
+            <div class="bond-line" id="mcl-vertical-bond" style="width: 2px; height: 30px; margin: 10px 0;"></div>
+            <div id="mcl-bottom" style="color: var(--secondary); transition: all 0.8s ease;">[ HO—C(CH₃)=CH₂ ]⁺</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="runKetoneSim()">Ionize & Fragment</button>
+        <button class="secondary" onclick="resetKetoneSim()">Reset</button>
+    </div>
+
+    <div class="info-text" id="ketone-info">
+        Choose a mode above to see how ketones break apart in the mass spec.
+    </div>
+</div>
+
+    <div class="card full-width">
+        <h2><span>📝</span> Common Fragment Loses</h2>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left;">
+                <th style="padding: 10px;">Mass Lost</th>
+                <th style="padding: 10px;">Probable Fragment</th>
+                <th style="padding: 10px;">Indicates...</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px;">M - 15</td>
+                <td style="padding: 10px;">•CH₃</td>
+                <td style="padding: 10px;">Methyl group loss</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px;">M - 18</td>
+                <td style="padding: 10px;">H₂O</td>
+                <td style="padding: 10px;">Alcohol dehydration</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px;">M - 29</td>
+                <td style="padding: 10px;">•CH₂CH₃</td>
+                <td style="padding: 10px;">Ethyl group loss</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<script>
+    function runFrag() {
+        const left = document.getElementById('frag-left');
+        const right = document.getElementById('frag-right');
+        const bond = document.getElementById('bond');
+        const info = document.getElementById('info-box');
+
+        // Animation
+        bond.classList.add('hidden-bond');
+        left.classList.add('break-left');
+        right.classList.add('break-right');
+
+        // Logic Change
+        setTimeout(() => {
+            right.innerHTML = "[ C≡O ]⁺";
+            info.innerHTML = "<strong>Acylium Ion Formed!</strong> The Propyl radical (left) is neutral and disappears. The C=O rehybridizes to linear <em>sp</em> to maximize stability. Detected at m/z 43.";
+        }, 400);
+    }
+
+    function resetFrag() {
+        const left = document.getElementById('frag-left');
+        const right = document.getElementById('frag-right');
+        const bond = document.getElementById('bond');
+        const info = document.getElementById('info-box');
+
+        bond.classList.remove('hidden-bond');
+        left.classList.remove('break-left');
+        right.classList.remove('break-right');
+        right.innerHTML = "[ C=O ]⁺";
+        info.innerHTML = "Molecule reset. Ready for ionization.";
+    }
+    function runMcLafferty() {
+        const left = document.getElementById('mcl-left');
+        const right = document.getElementById('mcl-right');
+        const bond = document.getElementById('mcl-bond');
+        const info = document.getElementById('mcl-info');
+
+        bond.style.opacity = "0";
+        left.classList.add('mcl-eject');
+        right.classList.add('mcl-stay');
+
+        info.innerHTML = "<strong>Result:</strong> An Enol Radical Cation (detected) and a neutral Ethylene (lost). Look for a prominent peak at <strong>m/z 58</strong> (for 2-pentanone).";
+    }
+
+    function resetMcLafferty() {
+        const left = document.getElementById('mcl-left');
+        const right = document.getElementById('mcl-right');
+        const bond = document.getElementById('mcl-bond');
+        
+        left.classList.remove('mcl-eject');
+        right.classList.remove('mcl-stay');
+        bond.style.opacity = "1";
+        document.getElementById('mcl-info').innerHTML = "Ready for rearrangement.";
+    }
+    let currentMode = 'alpha';
+
+function setMode(mode) {
+    currentMode = mode;
+    resetKetoneSim(); // Clean up animations
+    
+    // Select the buttons
+    const btnAlpha = document.getElementById('btn-alpha');
+    const btnMcl = document.getElementById('btn-mcl');
+    const info = document.getElementById('ketone-info');
+
+    if (mode === 'alpha') {
+        // Alpha is Active (Pink), McLafferty is Inactive (Grey)
+        btnAlpha.classList.remove('secondary');
+        btnAlpha.style.backgroundColor = "var(--secondary)";
+        
+        btnMcl.classList.add('secondary');
+        btnMcl.style.backgroundColor = ""; // Lets CSS class take over
+        
+        document.getElementById('alpha-view').style.display = 'flex';
+        document.getElementById('mcl-view').style.display = 'none';
+        info.innerHTML = "Ready for Alpha-Cleavage (Acylium formation).";
+    } else {
+        // McLafferty is Active (Pink), Alpha is Inactive (Grey)
+        btnMcl.classList.remove('secondary');
+        btnMcl.style.backgroundColor = "var(--secondary)";
+        
+        btnAlpha.classList.add('secondary');
+        btnAlpha.style.backgroundColor = ""; // Lets CSS class take over
+        
+        document.getElementById('alpha-view').style.display = 'none';
+        document.getElementById('mcl-view').style.display = 'flex';
+        info.innerHTML = "Ready for McLafferty Rearrangement (requires Gamma-H).";
+    }
+}
+
+    function runKetoneSim() {
+        const info = document.getElementById('ketone-info');
+        
+        if (currentMode === 'alpha') {
+            document.getElementById('alpha-bond').style.opacity = "0";
+            document.getElementById('alk-chain').classList.add('eject-left');
+            const acyl = document.getElementById('acyl-ion');
+            acyl.classList.add('glow-acylium');
+            acyl.innerHTML = "[ C≡O ]⁺";
+            info.innerHTML = "<strong>Alpha-Cleavage:</strong> The R group is lost as a neutral radical. The <strong>Acylium ion</strong> is detected (m/z 43 for methyl ketones).";
+        } else {
+            document.getElementById('mcl-vertical-bond').style.opacity = "0";
+            document.getElementById('mcl-top').classList.add('eject-up');
+            document.getElementById('mcl-bottom').classList.add('glow-enol');
+            info.innerHTML = "<strong>McLafferty:</strong> A 6-membered transition state transfers a H to Oxygen. An <strong>alkene</strong> is ejected, leaving an <strong>Enol Radical Cation</strong> (Even mass!).";
+        }
+    }
+
+    function resetKetoneSim() {
+        // Reset Alpha elements
+        document.getElementById('alpha-bond').style.opacity = "1";
+        document.getElementById('alk-chain').classList.remove('eject-left');
+        const acyl = document.getElementById('acyl-ion');
+        acyl.classList.remove('glow-acylium');
+        acyl.innerHTML = "[ C=O ]⁺";
+
+        // Reset McLafferty elements
+        document.getElementById('mcl-vertical-bond').style.opacity = "1";
+        document.getElementById('mcl-top').classList.remove('eject-up');
+        document.getElementById('mcl-bottom').classList.remove('glow-enol');
+    }
+    function runSigma() {
+    const left = document.getElementById('alk-l');
+    const right = document.getElementById('alk-r');
+    const bond = document.getElementById('bond-sigma');
+    const info = document.getElementById('info-sigma');
+
+    // 1. 'Ionize' the bond (make it disappear/break)
+    bond.classList.add('hidden-bond');
+    
+    // 2. Add animation classes
+    left.classList.add('sigma-break-left');
+    right.classList.add('sigma-break-right');
+
+    // 3. Update Text with Logic
+    setTimeout(() => {
+        left.innerHTML = "[(CH₃)₂CH]⁺"; // Show Formal Charge
+        right.innerHTML = "•CH₃";      // Show Neutral Radical
+        info.innerHTML = "<strong>Result:</strong> Thermochemically weakest bond breaks. You created a stable <strong>Secondary Isopropyl Cation</strong> (detected) and a primary methyl radical (lost).";
+    }, 400); // Slight delay for visual impact
+}
+
+// 2. Inductive Cleavage (Halogens)
+function runInductive() {
+    const left = document.getElementById('hal-l');
+    const right = document.getElementById('hal-r');
+    const bond = document.getElementById('bond-inductive');
+    const info = document.getElementById('info-inductive');
+
+    // 1. Break the bond (heterolytically)
+    bond.classList.add('hidden-bond');
+    
+    // 2. Add animation classes
+    left.classList.add('inductive-break-left');
+    right.classList.add('inductive-break-right');
+
+    // 3. Update Text with Logic
+    setTimeout(() => {
+        left.innerHTML = "[CH₃CH₂]⁺"; // Show the Carbocation
+        right.innerHTML = "Cl•";       // Show the Halogen Radical
+        info.innerHTML = "<strong>Inductive Pull:</strong> The positive Cl ion (halogen) pulled the sigma-electron pair towards itself (heterolysis). This created a <strong>Primary Ethyl Cation</strong> (detected) and a Chlorine radical (lost).";
+    }, 400); 
+}
+
+// --- Universal Reset Function ---
+function resetSim(type) {
+    let l, r, b, i;
+    
+    if(type === 'sigma') {
+        l = document.getElementById('alk-l'); r = document.getElementById('alk-r');
+        b = document.getElementById('bond-sigma'); i = document.getElementById('info-sigma');
+        l.classList.remove('sigma-break-left'); r.classList.remove('sigma-break-right');
+        l.innerHTML = "(CH₃)₂CH <div class='bond-line' id='bond-sigma'></div>";
+        i.innerHTML = "Ready for ionization.";
+    } else if (type === 'inductive') {
+        l = document.getElementById('hal-l'); r = document.getElementById('hal-r');
+        b = document.getElementById('bond-inductive'); i = document.getElementById('info-inductive');
+        l.classList.remove('inductive-break-left'); r.classList.remove('inductive-break-right');
+        l.innerHTML = "CH₃CH₂ <div class='bond-line' id='bond-inductive'></div>";
+        i.innerHTML = "Ready for inductive cleavage.";
+    }
+    // (You will need to re-add the bond line div when resetting innerHTML, as above)
+}
+</script>
+
+</body>
+</html>
