@@ -1,5 +1,3 @@
-Here is a comprehensive `README.md` file designed for your project. It covers the technical stack, the chemical principles visualized, and instructions on how to maintain or expand the lab.
-
 ---
 
 # 🌀 MS-Explorer: Interactive Mass Spectrometry Lab
