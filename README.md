@@ -1,8 +1,3 @@
-# orgoproj
-Here is a comprehensive `README.md` file designed for your project. It covers the technical stack, the chemical principles visualized, and instructions on how to maintain or expand the lab.
-
----
-
 # 🌀 MS-Explorer: Interactive Mass Spectrometry Lab
 
 **MS-Explorer** is a high-fidelity, interactive educational dashboard designed to visualize the complex dynamics of Organic Mass Spectrometry. By combining modern web aesthetics (Glassmorphism) with accurate chemical fragmentation logic, it allows students and researchers to "see" how molecules break apart inside a mass spectrometer.
